@@ -39,6 +39,16 @@ res_ama = cv.bitwise_and(img, img, mask=mask_ama)
 res_azul = cv.bitwise_and(img, img, mask=mask_azul)
 res_verde = cv.bitwise_and(img, img, mask=mask_verde)
 
+x,y = mask_rojo.shape
+for i in range(x):
+    for j in range(y):
+        if (mask_rojo[i,j] == 0):
+            mask_rojo[i,j] = 150
+        else:
+            mask_rojo[i,j] = 180
+        cv.imshow('mascara', mask_rojo)
+        cv.waitKey(40)
+
 #imprimir imagen
 cv.imshow('imagen', hsv)
 cv.imshow('rojo', res_rojo)
