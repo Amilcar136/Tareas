@@ -35,6 +35,27 @@ while True:
         bp1 = p1[st ==1]
         bp0 = p0[st ==1]
         
+        '''for i, (nv, vj) in enumerate(zip(bp1, bp0)):
+            a, b = (int(x) for x in nv.ravel())
+            c, d = (int(x) for x in vj.ravel())
+            dist = np.linalg.norm(nv.ravel() - vj.ravel())'''
+
+            # Dibujar líneas horizontales entre los puntos consecutivos
+        for i in range(len(bp1) - 1):
+            a, b = (int(x) for x in bp1[i].ravel())
+            c, d = (int(x) for x in bp1[i+1].ravel())
+            frame = cv.line(frame, (a,b), (c,d), (0,0,255), 2)
+
+            # Dibujar líneas verticales entre los puntos consecutivos
+        for i in range(0, len(bp1), 5):
+            for j in range(5):
+                if i + j < len(bp1):
+                    a, b = (int(x) for x in bp1[i+j].ravel())
+                    if i + j + 5 < len(bp1):
+                        c, d = (int(x) for x in bp1[i+j+5].ravel())
+                        frame = cv.line(frame, (a,b), (c,d), (0,0,255), 2)
+
+            # Dibujar círculos en los puntos
         for i, (nv, vj) in enumerate(zip(bp1, bp0)):
             a, b = (int(x) for x in nv.ravel())
             c, d = (int(x) for x in vj.ravel())
@@ -42,9 +63,7 @@ while True:
 
             #print(i, dist)
             
-            
-            
-            frame = cv.line(frame, (c,d), (a,b), (0,0,255), 2)
+            #frame = cv.line(frame, (c,d), (a,b), (0,0,255), 2)
             frame = cv.circle(frame, (c,d), 2, (255,0,0),-1)
             frame = cv.circle(frame, (a,b), 3, (0,255,0),-1)
         cv.imshow('ventana', frame)
