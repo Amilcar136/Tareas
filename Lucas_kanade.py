@@ -61,9 +61,8 @@ while True:
             c, d = (int(x) for x in vj.ravel())
             dist = np.linalg.norm(nv.ravel() - vj.ravel())
 
-            primeros_4_puntos = bp1[:4]
-            distancias = [np.linalg.norm(punto.ravel()) for punto in primeros_4_puntos]
-            print("Distancias euclidianas:", distancias)
+            if i < 4:
+                print(f"Distancia {i+1}: {dist}")
             
 
             frame = cv.line(frame, (c,d), (a,b), (0,0,255), 2)
