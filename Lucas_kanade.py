@@ -61,9 +61,12 @@ while True:
             c, d = (int(x) for x in vj.ravel())
             dist = np.linalg.norm(nv.ravel() - vj.ravel())
 
-            #print(i, dist)
+            primeros_4_puntos = bp1[:4]
+            distancias = [np.linalg.norm(punto.ravel()) for punto in primeros_4_puntos]
+            print("Distancias euclidianas:", distancias)
             
-            #frame = cv.line(frame, (c,d), (a,b), (0,0,255), 2)
+
+            frame = cv.line(frame, (c,d), (a,b), (0,0,255), 2)
             frame = cv.circle(frame, (c,d), 2, (255,0,0),-1)
             frame = cv.circle(frame, (a,b), 3, (0,255,0),-1)
         cv.imshow('ventana', frame)
