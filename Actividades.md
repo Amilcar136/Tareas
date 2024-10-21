@@ -22,3 +22,11 @@ Resultados codigo 1:
 Resultados codigo 2:
 
 ![res 2](image-2.png)
+
+### Actividad 3: - Aplicar las transformaciones geométricas vistas en clase.
+
+![Act3](image-4.png)
+
+Resultado:
+
+![Resact3](image-5.png)
