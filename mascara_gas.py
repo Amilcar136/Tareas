@@ -1,30 +1,20 @@
 import cv2
 import numpy as np
 
-print("Opcion 1: mascara de jason")
-print("Opcion 2: mascara de diablo")
-print("Opcion 3: mascara de pug")
-print("Opcion 4: mascara de mister T")
-print("Opcion 5: mascara de spiderman")
-opc = input("Eliga una opcion: ")
-if opc == 1:
-    mascara = cv2.imread('jason.png', cv2.IMREAD_UNCHANGED)
-elif opc == 2:
-    mascara = cv2.imread('diablo.png', cv2.IMREAD_UNCHANGED)
-elif opc == 3:
-    mascara = cv2.imread('mascarapug.png', cv2.IMREAD_UNCHANGED)
-elif opc == 4:
-    mascara = cv2.imread('mistert.png', cv2.IMREAD_UNCHANGED)
-elif opc == 5:
-    mascara = cv2.imread('spider.png', cv2.IMREAD_UNCHANGED)
+# Cargar las máscaras que deseas agregar (asegúrate de que sean PNG con transparencia)
+mascaras = [
+    cv2.imread('jason.png', cv2.IMREAD_UNCHANGED),
+    cv2.imread('diablo.png', cv2.IMREAD_UNCHANGED),
+    cv2.imread('mascarapug.png', cv2.IMREAD_UNCHANGED),
+    cv2.imread('mistert.png', cv2.IMREAD_UNCHANGED),
+    cv2.imread('spider.png', cv2.IMREAD_UNCHANGED)
+]
 
-# Cargar la máscara que deseas agregar (asegúrate de que sea PNG con transparencia)
-mascara = cv2.imread(mascara, cv2.IMREAD_UNCHANGED)  # Cargar PNG con transparencia
-
-# Verificar si la imagen tiene un canal alfa
-if mascara.shape[2] != 4:
-    print("Error: La imagen no tiene canal alfa.")
-    exit()
+# Verificar que todas las imágenes tienen un canal alfa
+for i, mascara in enumerate(mascaras):
+    if mascara.shape[2] != 4:
+        print(f"Error: La máscara {i + 1} no tiene canal alfa.")
+        exit()
 
 # Cargar el clasificador preentrenado de rostros
 face_cascade = cv2.CascadeClassifier('C:\\Users\\amilc\\Desktop\\Python\\Grafi\\haarcascade_frontalface_alt2.xml')
@@ -33,8 +23,31 @@ face_cascade = cv2.CascadeClassifier('C:\\Users\\amilc\\Desktop\\Python\\Grafi\\
 video = cv2.VideoCapture(0)
 
 # Definir un desplazamiento para mover la máscara
-desplazamiento_x = 0  # Mover 50 píxeles hacia la derecha
-desplazamiento_y = -20  # Mover 30 píxeles hacia arriba
+desplazamiento_x = 0  # Mover 0 píxeles hacia la derecha
+desplazamiento_y = 60  # Mover 60 píxeles hacia arriba
+
+# Mostrar el menú de selección de máscara
+print("Opcion 1: mascara de jason")
+print("Opcion 2: mascara de diablo")
+print("Opcion 3: mascara de pug")
+print("Opcion 4: mascara de Mister T")
+print("Opcion 5: mascara de spiderman")
+opc = int(input("Ingresa la opcion que quieras (1-5): "))
+
+# Seleccionar la máscara usando if
+if opc == 1:
+    mascara_seleccionada = mascaras[0]
+elif opc == 2:
+    mascara_seleccionada = mascaras[1]
+elif opc == 3:
+    mascara_seleccionada = mascaras[2]
+elif opc == 4:
+    mascara_seleccionada = mascaras[3]
+elif opc == 5:
+    mascara_seleccionada = mascaras[4]
+else:
+    print("Opción no válida, se usará la máscara 1 por defecto.")
+    mascara_seleccionada = mascaras[0]
 
 while True:
     # Leer cada frame del video
@@ -47,12 +60,12 @@ while True:
     frame_gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     # Detectar los rostros en el frame
-    rostros = face_cascade.detectMultiScale(frame_gris, scaleFactor=1.9, minNeighbors=6, minSize=(30, 30))
+    rostros = face_cascade.detectMultiScale(frame_gris, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
     # Procesar cada rostro detectado
     for (x, y, w, h) in rostros:
-        # Redimensionar la máscara para que coincida con el tamaño del rostro detectado
-        mascara_redimensionada = cv2.resize(mascara, (w, h))
+        # Redimensionar la máscara seleccionada para que coincida con el tamaño del rostro detectado
+        mascara_redimensionada = cv2.resize(mascara_seleccionada, (w, h))
 
         # Separar los canales de la máscara: color y alfa (transparencia)
         mascara_rgb = mascara_redimensionada[:, :, :3]
@@ -75,7 +88,7 @@ while True:
         roi = frame[y_nuevo:y_nuevo+h, x_nuevo:x_nuevo+w]
 
         # Asegurarse de que la ROI y la máscara tengan el mismo tamaño
-        if roi.shape[:2] == mascara_alpha.shape[:2]:
+        if roi.shape [:2] == mascara_alpha.shape[:2]:
             # Invertir la máscara alfa para obtener la parte del rostro donde se aplicará la máscara
             mascara_alpha_inv = cv2.bitwise_not(mascara_alpha)
 
