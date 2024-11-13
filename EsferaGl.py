@@ -32,10 +32,10 @@ def init():
     glLightfv(GL_LIGHT0, GL_AMBIENT, ambient_light)
 
     # Configuración de las propiedades de material
-    material_diffuse = [0.5, 0.5, 1.0, 1.0]  # Color difuso (azul claro)
+    material_diffuse = [0.5, 0.25, 0.1, 1.0]  # Color difuso (azul claro)
     glMaterialfv(GL_FRONT, GL_DIFFUSE, material_diffuse)
 
-def draw_sphere(radius=1, slices=32, stacks=32):
+def draw_egg(radius=1, slices=32, stacks=32):
     global rotation_angle, movement_offset
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glLoadIdentity()
@@ -43,7 +43,12 @@ def draw_sphere(radius=1, slices=32, stacks=32):
     glRotatef(rotation_angle, 0, 1, 0)  # Rotar la esfera sobre su eje Y
 
     quadric = gluNewQuadric()
-    gluSphere(quadric, radius, slices, stacks)  # Dibujar la esfera
+    glPushMatrix()
+    glScalef(1.0, 1.5, 1.0)
+    gluSphere(quadric, radius, slices, stacks)
+    glPopMatrix()  # Dibujar la esfera
+
+    glfw.swap_buffers(window)
 
     glfw.swap_buffers(window)
 
@@ -71,7 +76,7 @@ def main():
     
     # Crear ventana de GLFW
     width, height = 500, 500
-    window = glfw.create_window(width, height, "Esfera en Movimiento y Rotación", None, None)
+    window = glfw.create_window(width, height, "Huevo en Movimiento y Rotación", None, None)
     if not window:
         glfw.terminate()
         sys.exit()
@@ -82,7 +87,7 @@ def main():
 
     # Bucle principal
     while not glfw.window_should_close(window):
-        draw_sphere()
+        draw_egg()
         update_motion()  # Actualizar el movimiento y rotación
         glfw.poll_events()
 
