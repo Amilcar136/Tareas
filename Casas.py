@@ -84,7 +84,7 @@ def draw_roof():
     glEnd()
 
 def draw_ground():
-    """Dibuja un plano para representar el suelo o calle"""
+    """Dibuja un plano para representar el suelo"""
     glBegin(GL_QUADS)
     glColor3f(0.3, 0.3, 0.3)  # Gris oscuro para la calle
 
@@ -95,11 +95,61 @@ def draw_ground():
     glVertex3f(-20, 0, -20)
     glEnd()
 
+def draw_ground2():
+    """Dibuja un plano para representar la calle"""
+    glBegin(GL_QUADS)
+    glColor3f(0.5, 0.5, 0.5)  # Gris oscuro para la calle
+
+    # Coordenadas del plano
+    glVertex3f(-7, 0.001, 2.5)
+    glVertex3f(7, 0.001, 2.5)
+    glVertex3f(7, 0, -2.5)
+    glVertex3f(-7, 0, -2.5)
+    glEnd()
+
+def draw_edif():
+    glBegin(GL_QUADS)
+    glColor3f(0.4, 0.44, 0.52)
+
+    # Piso 1
+    glVertex3f(-1, 0, -3)
+    glVertex3f(1, 0, -3)
+    glVertex3f(1, 3, -3)
+    glVertex3f(-1, 3, -3)
+
+    # Piso 2
+    glVertex3f(-1, 3, -3)
+    glVertex3f(1, 3, -3)
+    glVertex3f(1, 6, -3)
+    glVertex3f(-1, 6, -3)
+
+    # Piso 3
+    glVertex3f(-1, 6, -3)
+    glVertex3f(1, 6, -3)
+    glVertex3f(1, 9, -3)
+    glVertex3f(-1, 9, -3)
+
+    # Lados
+    glVertex3f(-1, 0, -3)
+    glVertex3f(-1, 9, -3)
+    glVertex3f(-1, 9, -5)
+    glVertex3f(-1, 0, -5)
+
+    glColor3f(0.62, 0.71, 0.9)  # Color más oscuro para los lados
+    glVertex3f(1, 0, -3)
+    glVertex3f(1, 9, -3)
+    glVertex3f(1, 9, -5)
+    glVertex3f(1, 0, -5)
+
+    glEnd()
+
+
 def draw_house():
     """Dibuja una casa (base + techo)"""
     draw_cube()  # Base de la casa
     draw_roof()  # Techo
 
+    
 def draw_scene():
     """Dibuja toda la escena con 4 casas"""
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -112,22 +162,38 @@ def draw_scene():
 
     # Dibujar el suelo
     draw_ground()
+    draw_ground2()
 
     # Dibujar las casas en diferentes posiciones
     positions = [
-        (-5, 0, -5),  # Casa 1
+        (-4, 0, -5),  # Casa 1
         (5, 0, -5),   # Casa 2
-        (-5, 0, 5),   # Casa 3
+        (-4, 0, 5),   # Casa 3
         (5, 0, 5),    # Casa 4
-        (-10, 0, -10),   # Casa 5
-        (-15, 0, -15),  #Casa 6
-        (-12, 0, -5),   #Casa 7
-        (0, 0, 0)   #Casa 8
+        (-1, 0, -5),  # Casa 5
+        (2, 0, -5),   # Casa 6
+        (2, 0, 5),    # Casa 7
+        (-1, 0, 5)    # Casa 8
+
     ]
+
+    positions_edif = [
+        (-8, 0, 3), #Edif 1
+        (-8, 0, 6)
+    ]
+
+
     for pos in positions:
         glPushMatrix()
         glTranslatef(*pos)  # Mover la casa a la posición actual 
         draw_house()        # Dibujar la casa
+        glPopMatrix()
+
+
+    for pos in positions_edif:
+        glPushMatrix()
+        glTranslatef(*pos)
+        draw_edif()
         glPopMatrix()
 
     glfw.swap_buffers(window)
