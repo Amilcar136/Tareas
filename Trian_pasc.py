@@ -15,14 +15,14 @@ def draw_triangle(x, y, color):
 def triang_Pasc(rows):
     triangle = []
     for i in range (rows):
-        for j in range (rows + i):
+        for j in range (i + 1):
             #Calcular posicion (x, y)
             x = (j - i / 2) * 0.5
             y = -i * 0.5
 
             color_value = (j / (i + 1), 0.5, 1.0 - (j / (i+1)))
             triangle.append((x, y, color_value))
-        return triangle
+    return triangle
 
 def main():
     # Inicializar GLFW
@@ -41,13 +41,13 @@ def main():
     # Establecer el color de fondo
     glClearColor(0.0, 0.0, 0.0, 1.0)
 
-    triangulo_pascal = triang_Pasc(5)
+    triangulos = triang_Pasc(5)
 
 
     while not glfw.window_should_close(window):
         glClear(GL_COLOR_BUFFER_BIT)
 
-        for (x, y, color) in triangulo_pascal:
+        for (x, y, color) in triangulos:
             draw_triangle(x, y, color)
 
         glfw.swap_buffers(window)
