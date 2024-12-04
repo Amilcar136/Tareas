@@ -14,7 +14,7 @@ scale = 0.1
 # Capturar video desde la cámara
 video = cv2.VideoCapture(0)
 
-#Textura pra fondo
+#Textura para fondo
 texture_id = None
 
 def init():
@@ -121,3 +121,56 @@ def process_frame():
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
     cv2.CHAIN_APPROX_SIMPLE)
 
+    if contours:
+        # Encontrar el contorno más grande
+        max_contour = max(contours, key=cv2.contourArea)
+        # Calcular el rectángulo delimitador
+        x, y, w, h = cv2.boundingRect(max_contour)
+        # Convertir coordenadas a OpenGL
+        x_opengl = (x + w / 2) / frame.shape[1] * 2 - 1
+        y_opengl = -(y + h / 2) / frame.shape[0] * 2 + 1
+        # Ajustar escala basada en el tamaño del rectángulo
+        scale = w / 200.0
+
+def main():
+    global window, angle
+    # Inicializar GLFW
+    if not glfw.init():
+        sys.exit()
+        
+    # Crear ventana de GLFW
+    width, height = 640, 480
+    window = glfw.create_window(width, height, "Cubo 3D con Control por Mano", None, None)
+
+    if not window:
+        glfw.terminate()
+        sys.exit()
+
+    # Configurar el contexto de OpenGL en la ventana
+    glfw.make_context_current(window)
+
+    # Configuración de viewport y OpenGL
+    glViewport(0, 0, width, height)
+    init()
+
+    # Bucle principal
+    while not glfw.window_should_close(window):
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) # Limpiar pantalla y buffer de profundidad
+        glLoadIdentity()
+
+        # Procesar el frame para actualizar la posición y escala
+        process_frame()
+
+        # Dibujar el cubo
+        draw_cube(x_opengl, y_opengl, scale)
+        
+        glfw.swap_buffers(window) # Intercambiar buffers para animación suave
+        angle += 0.1 # Incrementar el ángulo para rotación
+        glfw.poll_events()
+
+    glfw.terminate() # Cerrar GLFW al salir
+    video.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
