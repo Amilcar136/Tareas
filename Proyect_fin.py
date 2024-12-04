@@ -103,3 +103,21 @@ def draw_cube(x, y, scale):
     glEnd()
     glPopMatrix()
 
+def process_frame():
+    global x_opengl, y_opengl, scale
+    ret, frame = video.read()
+    if not ret:
+        return
+
+    # Convertir el frame a escala de grises
+    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Aplicar desenfoque para suavizar
+    frame_blur = cv2.GaussianBlur(frame_gray, (15, 15), 0)
+
+    # Detectar los contornos
+    _, thresh = cv2.threshold(frame_blur, 60, 255,
+    cv2.THRESH_BINARY_INV)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
+    cv2.CHAIN_APPROX_SIMPLE)
+
