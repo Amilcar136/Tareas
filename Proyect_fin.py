@@ -14,7 +14,11 @@ scale = 0.1
 # Capturar video desde la cámara
 video = cv2.VideoCapture(0)
 
+#Textura pra fondo
+texture_id = None
+
 def init():
+    global texture_id
 
     # Configuración inicial de OpenGL
     glClearColor(0.0, 0.0, 0.0, 1.0) # Color de fondo
@@ -28,6 +32,30 @@ def init():
     # Cambiar a la matriz de modelo para los objetos
     glMatrixMode(GL_MODELVIEW)
 
+    #Generar textura
+    texture_id = glGenTextures(1)
+
+def video_background(frame):
+    global texture_id
+
+    #Cargar textura
+    glBindTexture(GL_TEXTURE_2D, texture_id)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.shape[1], frame.shape[0], 0, GL_BGR, GL_UNSIGNED_BYTE, frame)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+
+    # Dibujar un cuadrado que cubre toda la ventana
+    glBegin(GL_QUADS)
+    glTexCoord2f(0, 0)
+    glVertex3f(-1, -1, -5)
+    glTexCoord2f(1, 0)
+    glVertex3f(1, -1, -5)
+    glTexCoord2f(1, 1)
+    glVertex3f(1, 1, -5)
+    glTexCoord2f(0, 1)
+    glVertex3f(-1, 1, -5)
+    glEnd()
+    
 def draw_cube(x, y, scale):
     global angle
     glPushMatrix()
