@@ -23,6 +23,7 @@ def init():
     # Configuración inicial de OpenGL
     glClearColor(0.0, 0.0, 0.0, 1.0) # Color de fondo
     glEnable(GL_DEPTH_TEST) # Activar prueba de profundidad para 3D
+    glEnable(GL_TEXTURE_2D)
 
     # Configuración de proyección
     glMatrixMode(GL_PROJECTION)
@@ -39,22 +40,25 @@ def video_background(frame):
     global texture_id
 
     #Cargar textura
+    frame = cv2.flip(frame, 0)
     glBindTexture(GL_TEXTURE_2D, texture_id)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.shape[1], frame.shape[0], 0, GL_BGR, GL_UNSIGNED_BYTE, frame)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
     # Dibujar un cuadrado que cubre toda la ventana
+    glDisable(GL_DEPTH_TEST)
     glBegin(GL_QUADS)
     glTexCoord2f(0, 0)
-    glVertex3f(-1, -1, -5)
+    glVertex3f(-1, -1, -1)
     glTexCoord2f(1, 0)
-    glVertex3f(1, -1, -5)
+    glVertex3f(1, -1, -1)
     glTexCoord2f(1, 1)
-    glVertex3f(1, 1, -5)
+    glVertex3f(1, 1, -1)
     glTexCoord2f(0, 1)
-    glVertex3f(-1, 1, -5)
+    glVertex3f(-1, 1, -1)
     glEnd()
+    glEnable(GL_DEPTH_TEST)
     
 def draw_cube(x, y, scale):
     global angle
@@ -107,7 +111,7 @@ def process_frame():
     global x_opengl, y_opengl, scale
     ret, frame = video.read()
     if not ret:
-        return
+        return None, False
 
     # Convertir el frame a escala de grises
     frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -116,10 +120,8 @@ def process_frame():
     frame_blur = cv2.GaussianBlur(frame_gray, (15, 15), 0)
 
     # Detectar los contornos
-    _, thresh = cv2.threshold(frame_blur, 60, 255,
-    cv2.THRESH_BINARY_INV)
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
-    cv2.CHAIN_APPROX_SIMPLE)
+    _, thresh = cv2.threshold(frame_blur, 60, 255, cv2.THRESH_BINARY_INV)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     if contours:
         # Encontrar el contorno más grande
@@ -131,6 +133,8 @@ def process_frame():
         y_opengl = -(y + h / 2) / frame.shape[0] * 2 + 1
         # Ajustar escala basada en el tamaño del rectángulo
         scale = w / 200.0
+
+        return frame, True
 
 def main():
     global window, angle
@@ -159,7 +163,9 @@ def main():
         glLoadIdentity()
 
         # Procesar el frame para actualizar la posición y escala
-        process_frame()
+        frame, valid = process_frame()
+        if valid:
+            video_background(frame)
 
         # Dibujar el cubo
         draw_cube(x_opengl, y_opengl, scale)
