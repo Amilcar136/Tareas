@@ -1,15 +1,20 @@
 import cv2
+import cv2.data
 import glfw
 from OpenGL.GL import *
 from OpenGL.GLU import *
+from OpenGL.GLUT import *
+import numpy as np
 import sys
+
 
 # Variables globales
 window = None
-angle = 0 # Ángulo de rotación del cubo
-x_opengl = 0.0
-y_opengl = 0.0
+#angle = 0  Ángulo de rotación del cubo
+x_rotation = 0.0
+y_rotation = 0.0
 scale = 0.1
+prev_center = None
 
 # Capturar video desde la cámara
 video = cv2.VideoCapture(0)
@@ -60,12 +65,12 @@ def video_background(frame):
     glEnd()
     glEnable(GL_DEPTH_TEST)
     
-def draw_cube(x, y, scale):
-    global angle
+def draw_cube():
     glPushMatrix()
-    glTranslatef(x, y, -5.0) # Posición basada en los movimientos
+    glTranslatef(0.0, 0.0, -5.0) # Posición basada en los movimientos
     glScalef(scale, scale, scale) # Escalar el cubo en función de la distancia
-    glRotatef(angle, 1, 1, 1) # Rotar el cubo en todos los ejes
+    glRotatef(x_rotation, 1, 0, 0) # Rotar el cubo en todos los ejes
+    glRotatef(y_rotation, 0, 1, 0)
     glBegin(GL_QUADS)
 
     glColor3f(1.0, 0.0, 0.0) # Rojo
@@ -108,7 +113,7 @@ def draw_cube(x, y, scale):
     glPopMatrix()
 
 def process_frame():
-    global x_opengl, y_opengl, scale
+    global x_rotation, y_rotation, prev_center
     ret, frame = video.read()
     if not ret:
         return None, False
@@ -126,19 +131,32 @@ def process_frame():
     if contours:
         # Encontrar el contorno más grande
         max_contour = max(contours, key=cv2.contourArea)
-        # Calcular el rectángulo delimitador
-        x, y, w, h = cv2.boundingRect(max_contour)
-        # Convertir coordenadas a OpenGL
-        x_opengl = (x + w / 2) / frame.shape[1] * 2 - 1
-        y_opengl = -(y + h / 2) / frame.shape[0] * 2 + 1
-        # Ajustar escala basada en el tamaño del rectángulo
-        scale = w / 200.0
+        #Calcular el centroide del contorno
+        M = cv2.moments(max_contour)
+        if M['m00'] != 0:
+            cx = int(M['m10'] / M['m00'])
+            cy = int(M['m01'] / M['m00'])
+
+            #Comparar con el centroide anterior para determinar el movimiento
+            if prev_center is not None:
+                dx = cx -prev_center[0]
+                dy = cy - prev_center[1]
+                x_rotation += (cy- frame.shape[0] / 2) / 100.00
+                y_rotation += (cx - frame.shape[1] / 2) / 100.00
+
+            prev_center = (cx, cy)
+
+        #Dibujar el contorno en el frame
+        cv2.drawContours(frame, [max_contour], -1, (0, 255, 0), 2)
 
         return frame, True
+    
+    #return frame, False
 
 def main():
-    global window, angle
-    # Inicializar GLFW
+    global window 
+
+    # Inicializar GLFW7
     if not glfw.init():
         sys.exit()
         
@@ -168,10 +186,10 @@ def main():
             video_background(frame)
 
         # Dibujar el cubo
-        draw_cube(x_opengl, y_opengl, scale)
+        draw_cube()
         
         glfw.swap_buffers(window) # Intercambiar buffers para animación suave
-        angle += 0.1 # Incrementar el ángulo para rotación
+        #angle += 0.1 # Incrementar el ángulo para rotación
         glfw.poll_events()
 
     glfw.terminate() # Cerrar GLFW al salir
