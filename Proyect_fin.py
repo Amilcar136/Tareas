@@ -1,199 +1,133 @@
 import cv2
-import cv2.data
-import glfw
+import numpy as np
 from OpenGL.GL import *
 from OpenGL.GLU import *
-from OpenGL.GLUT import *
-import numpy as np
-import sys
-
+import glfw
 
 # Variables globales
-window = None
-#angle = 0  Ángulo de rotación del cubo
-x_rotation = 0.0
-y_rotation = 0.0
-scale = 0.1
-prev_center = None
+window_width, window_height = 800, 600
+rotation = [0, 0, 0]  # Rotación (x, y, z)
+translation = [0, 0, -5]  # Traslación inicial
+scale = 1.0  # Escalamiento
+cap = cv2.VideoCapture(0)
 
-# Capturar video desde la cámara
-video = cv2.VideoCapture(0)
+# Función para dibujar el tetraedro
+def draw_tetrahedron():
+    glBegin(GL_TRIANGLES)
+    vertices = [
+        (0, 1, 0),
+        (-1, -1, -1),
+        (1, -1, -1),
+        (0, -1, 1)
+    ]
+    faces = [
+        (0, 1, 2),
+        (0, 1, 3),
+        (0, 2, 3),
+        (1, 2, 3)
+    ]
+    colors = [
+        (1, 0, 0),
+        (0, 1, 0),
+        (0, 0, 1),
+        (1, 1, 0)
+    ]
+    for i, face in enumerate(faces):
+        glColor3fv(colors[i])
+        for vertex in face:
+            glVertex3fv(vertices[vertex])
+    glEnd()
 
-#Textura para fondo
-texture_id = None
+# Función para actualizar transformaciones en base a la nariz
+def detect_and_update():
+    global rotation, translation, scale
+    ret, frame = cap.read()
+    if not ret:
+        return
+    frame = cv2.flip(frame, 1)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-def init():
-    global texture_id
+    # Detectar rostros
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(50,50))
+    if len(faces) > 0:
+        x, y, w, h = faces[0]  # Primer rostro detectado
+        height, width = gray.shape[:2]
 
-    # Configuración inicial de OpenGL
-    glClearColor(0.0, 0.0, 0.0, 1.0) # Color de fondo
-    glEnable(GL_DEPTH_TEST) # Activar prueba de profundidad para 3D
-    glEnable(GL_TEXTURE_2D)
+        x, y, w, h = max(0, x), max(0, y), min(w, width - x), min(h, height - y)  # Primer rostro detectado
+        if w > 0 and h > 0:  # Validar que el ROI es válido
+            roi_gray = gray[y:y+h, x:x+w]
+            roi_color = frame[y:y+h, x:x+w]
+        else:
+            return  # Salir si no hay ROI válido
 
-    # Configuración de proyección
-    glMatrixMode(GL_PROJECTION)
+        # Detectar puntos faciales
+        _, landmarks = landmark_model.fit(roi_gray, np.array([faces]))
+        nose = landmarks[0][0][30]  # Punto de la nariz (landmark 30)
+
+        # Ajustar transformaciones
+        nose_x = nose[0] + x
+        nose_y = nose[1] + y
+        rotation[0] = (nose_y / window_height) * 360 - 180
+        rotation[1] = (nose_x / window_width) * 360 - 180
+        scale = 1 + (w / window_width)
+
+# Renderizar la escena
+def render():
+    global translation, rotation, scale
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glLoadIdentity()
-    gluPerspective(45, 1.0, 1.0, 50.0)
 
-    # Cambiar a la matriz de modelo para los objetos
-    glMatrixMode(GL_MODELVIEW)
+    # Aplicar transformaciones
+    glTranslatef(*translation)
+    glScalef(scale, scale, scale)
+    glRotatef(rotation[0], 1.0, 0.0, 0.0)
+    glRotatef(rotation[1], 0.0, 1.0, 0.0)
+    glRotatef(rotation[2], 0.0, 0.0, 1.0)
 
-    #Generar textura
-    texture_id = glGenTextures(1)
+    draw_tetrahedron()
 
-def video_background(frame):
-    global texture_id
+    # Dibujar fondo (cámara)
+    ret, frame = cap.read()
+    if not ret:
+        return
+    frame = cv2.flip(frame, 1)
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame = cv2.resize(frame, (window_width, window_height))
+    glDrawPixels(window_width, window_height, GL_RGB, GL_UNSIGNED_BYTE, frame)
 
-    #Cargar textura
-    frame = cv2.flip(frame, 0)
-    glBindTexture(GL_TEXTURE_2D, texture_id)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.shape[1], frame.shape[0], 0, GL_BGR, GL_UNSIGNED_BYTE, frame)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-
-    # Dibujar un cuadrado que cubre toda la ventana
-    glDisable(GL_DEPTH_TEST)
-    glBegin(GL_QUADS)
-    glTexCoord2f(0, 0)
-    glVertex3f(-1, -1, -1)
-    glTexCoord2f(1, 0)
-    glVertex3f(1, -1, -1)
-    glTexCoord2f(1, 1)
-    glVertex3f(1, 1, -1)
-    glTexCoord2f(0, 1)
-    glVertex3f(-1, 1, -1)
-    glEnd()
-    glEnable(GL_DEPTH_TEST)
-    
-def draw_cube():
+    # Transformaciones y dibujo del tetraedro
     glPushMatrix()
-    glTranslatef(0.0, 0.0, -5.0) # Posición basada en los movimientos
-    glScalef(scale, scale, scale) # Escalar el cubo en función de la distancia
-    glRotatef(x_rotation, 1, 0, 0) # Rotar el cubo en todos los ejes
-    glRotatef(y_rotation, 0, 1, 0)
-    glBegin(GL_QUADS)
-
-    glColor3f(1.0, 0.0, 0.0) # Rojo
-    glVertex3f(1, 1, -1)
-    glVertex3f(-1, 1, -1)
-    glVertex3f(-1, 1, 1)
-    glVertex3f(1, 1, 1)
-
-    glColor3f(0.0, 1.0, 0.0) # Verde
-    glVertex3f(1, -1, 1)
-    glVertex3f(-1, -1, 1)
-    glVertex3f(-1, -1, -1)
-    glVertex3f(1, -1, -1)
-
-    glColor3f(0.0, 0.0, 1.0) # Azul
-    glVertex3f(1, 1, 1)
-    glVertex3f(-1, 1, 1)
-    glVertex3f(-1, -1, 1)
-    glVertex3f(1, -1, 1)
-
-    glColor3f(1.0, 1.0, 0.0) # Amarillo
-    glVertex3f(1, -1, -1)
-    glVertex3f(-1, -1, -1)
-    glVertex3f(-1, 1, -1)
-    glVertex3f(1, 1, -1)
-
-    glColor3f(1.0, 0.0, 1.0) # Magenta
-    glVertex3f(-1, 1, 1)
-    glVertex3f(-1, 1, -1)
-    glVertex3f(-1, -1, -1)
-    glVertex3f(-1, -1, 1)
-
-    glColor3f(0.0, 1.0, 1.0) # Cyan
-    glVertex3f(1, 1, -1)
-    glVertex3f(1, 1, 1)
-    glVertex3f(1, -1, 1)
-    glVertex3f(1, -1, -1)
-
-    glEnd()
+    glTranslatef(translation[0], translation[1], translation[2])
+    glScalef(scale, scale, scale)
+    glRotatef(rotation[0], 1, 0, 0)
+    glRotatef(rotation[1], 0, 1, 0)
+    glRotatef(rotation[2], 0, 0, 1)
+    draw_tetrahedron()
     glPopMatrix()
 
-def process_frame():
-    global x_rotation, y_rotation, prev_center
-    ret, frame = video.read()
-    if not ret:
-        return None, False
-
-    # Convertir el frame a escala de grises
-    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-    # Aplicar desenfoque para suavizar
-    frame_blur = cv2.GaussianBlur(frame_gray, (15, 15), 0)
-
-    # Detectar los contornos
-    _, thresh = cv2.threshold(frame_blur, 60, 255, cv2.THRESH_BINARY_INV)
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    if contours:
-        # Encontrar el contorno más grande
-        max_contour = max(contours, key=cv2.contourArea)
-        #Calcular el centroide del contorno
-        M = cv2.moments(max_contour)
-        if M['m00'] != 0:
-            cx = int(M['m10'] / M['m00'])
-            cy = int(M['m01'] / M['m00'])
-
-            #Comparar con el centroide anterior para determinar el movimiento
-            if prev_center is not None:
-                dx = cx -prev_center[0]
-                dy = cy - prev_center[1]
-                x_rotation += (cy- frame.shape[0] / 2) / 100.00
-                y_rotation += (cx - frame.shape[1] / 2) / 100.00
-
-            prev_center = (cx, cy)
-
-        #Dibujar el contorno en el frame
-        cv2.drawContours(frame, [max_contour], -1, (0, 255, 0), 2)
-
-        return frame, True
-    
-    #return frame, False
-
+# Bucle principal
 def main():
-    global window 
-
-    # Inicializar GLFW7
     if not glfw.init():
-        sys.exit()
-        
-    # Crear ventana de GLFW
-    width, height = 640, 480
-    window = glfw.create_window(width, height, "Cubo 3D con Control por Mano", None, None)
+        print("No se pudo inicializar GLFW")
+        return
 
+    window = glfw.create_window(window_width, window_height, "Figura 3D con GLFW", None, None)
     if not window:
         glfw.terminate()
-        sys.exit()
+        print("No se pudo crear la ventana GLFW")
+        return
 
-    # Configurar el contexto de OpenGL en la ventana
     glfw.make_context_current(window)
+    glEnable(GL_DEPTH_TEST)
 
-    # Configuración de viewport y OpenGL
-    glViewport(0, 0, width, height)
-    init()
-
-    # Bucle principal
     while not glfw.window_should_close(window):
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) # Limpiar pantalla y buffer de profundidad
-        glLoadIdentity()
-
-        # Procesar el frame para actualizar la posición y escala
-        frame, valid = process_frame()
-        if valid:
-            video_background(frame)
-
-        # Dibujar el cubo
-        draw_cube()
-        
-        glfw.swap_buffers(window) # Intercambiar buffers para animación suave
-        #angle += 0.1 # Incrementar el ángulo para rotación
+        detect_and_update()  # Detección facial y ajustes
+        render()  # Renderizar la escena
+        glfw.swap_buffers(window)
         glfw.poll_events()
 
-    glfw.terminate() # Cerrar GLFW al salir
-    video.release()
+    glfw.terminate()
+    cap.release()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
