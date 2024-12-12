@@ -9,7 +9,13 @@ window_width, window_height = 800, 600
 rotation = [0, 0, 0]  # Rotación (x, y, z)
 translation = [0, 0, -5]  # Traslación inicial
 scale = 1.0  # Escalamiento
-cap = cv2.VideoCapture(0)
+
+def init_gl():
+    glEnable(GL_DEPTH_TEST)
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity()
+    gluPerspective(45, window_width / window_height, 0.1, 50.0)
+    glMatrixMode(GL_MODELVIEW)
 
 # Función para dibujar el tetraedro
 def draw_tetrahedron():
@@ -38,38 +44,6 @@ def draw_tetrahedron():
             glVertex3fv(vertices[vertex])
     glEnd()
 
-# Función para actualizar transformaciones en base a la nariz
-def detect_and_update():
-    global rotation, translation, scale
-    ret, frame = cap.read()
-    if not ret:
-        return
-    frame = cv2.flip(frame, 1)
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-    # Detectar rostros
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(50,50))
-    if len(faces) > 0:
-        x, y, w, h = faces[0]  # Primer rostro detectado
-        height, width = gray.shape[:2]
-
-        x, y, w, h = max(0, x), max(0, y), min(w, width - x), min(h, height - y)  # Primer rostro detectado
-        if w > 0 and h > 0:  # Validar que el ROI es válido
-            roi_gray = gray[y:y+h, x:x+w]
-            roi_color = frame[y:y+h, x:x+w]
-        else:
-            return  # Salir si no hay ROI válido
-
-        # Detectar puntos faciales
-        _, landmarks = landmark_model.fit(roi_gray, np.array([faces]))
-        nose = landmarks[0][0][30]  # Punto de la nariz (landmark 30)
-
-        # Ajustar transformaciones
-        nose_x = nose[0] + x
-        nose_y = nose[1] + y
-        rotation[0] = (nose_y / window_height) * 360 - 180
-        rotation[1] = (nose_x / window_width) * 360 - 180
-        scale = 1 + (w / window_width)
 
 # Renderizar la escena
 def render():
@@ -85,45 +59,86 @@ def render():
     glRotatef(rotation[2], 0.0, 0.0, 1.0)
 
     draw_tetrahedron()
+    glfw.swap_buffers(window)
 
-    # Dibujar fondo (cámara)
-    ret, frame = cap.read()
-    if not ret:
+def update_transformations(contour, width, height):
+    global translation, rotation, scale
+
+    #Calcular momentos del contorno
+    moments = cv2.moments(contour)
+    if moments['m00'] == 0:
         return
-    frame = cv2.flip(frame, 1)
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    frame = cv2.resize(frame, (window_width, window_height))
-    glDrawPixels(window_width, window_height, GL_RGB, GL_UNSIGNED_BYTE, frame)
+    
+    # Centroide del contorno
+    cx = int(moments['m10'] / moments['m00'])
+    cy = int(moments['m01'] / moments['m00'])
 
-    # Transformaciones y dibujo del tetraedro
-    glPushMatrix()
-    glTranslatef(translation[0], translation[1], translation[2])
-    glScalef(scale, scale, scale)
-    glRotatef(rotation[0], 1, 0, 0)
-    glRotatef(rotation[1], 0, 1, 0)
-    glRotatef(rotation[2], 0, 0, 1)
-    draw_tetrahedron()
-    glPopMatrix()
+    # Calcular traslación
+    translation[0] = (cx / width - 0.5) * 10  # Mapea el rango [0, ancho] a [-5, 5]
+    translation[1] = -(cy / height - 0.5) * 10 # Invertir para OpenGL
+
+    # Calcular escala basada en el área del contorno
+    area = cv2.contourArea(contour)
+    scale = 1 + (area / (width * height)) * 5
+
+    # Calcular rotación basada en el ángulo del contorno
+    rect = cv2.minAreaRect(contour)
+    angle = rect[-1]
+    rotation[2] = angle
 
 # Bucle principal
 def main():
+    global window
+
+    #Iniciar glfw
     if not glfw.init():
-        print("No se pudo inicializar GLFW")
-        return
+        raise Exception("No se pudo inicializar GLFW")
 
     window = glfw.create_window(window_width, window_height, "Figura 3D con GLFW", None, None)
     if not window:
         glfw.terminate()
-        print("No se pudo crear la ventana GLFW")
-        return
+        raise Exception("No se pudo crear la ventana GLFW")
 
     glfw.make_context_current(window)
-    glEnable(GL_DEPTH_TEST)
+    init_gl()
+
+    #iniciar camara con opencv
+    cap = cv2.VideoCapture(0)
 
     while not glfw.window_should_close(window):
-        detect_and_update()  # Detección facial y ajustes
-        render()  # Renderizar la escena
-        glfw.swap_buffers(window)
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Procesar imagen
+        frame = cv2.flip(frame, 1)
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        # Definir rango de color de piel en HSV
+        lower_skin = np.array([0, 20, 70], dtype=np.uint8)
+        upper_skin = np.array([20, 255, 255], dtype=np.uint8)
+
+        # Máscara para aislar la piel
+        mask = cv2.inRange(hsv, lower_skin, upper_skin)
+
+        # Filtrar ruido
+        mask = cv2.medianBlur(mask, 5)
+
+        # Encontrar contornos
+        contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        if contours:
+            # Tomar el contorno más grande
+            largest_contour = max(contours, key=cv2.contourArea)
+            update_transformations(largest_contour, frame.shape[1], frame.shape[0])
+
+        # Renderizar escena
+        render()
+
+        # Mostrar video en una ventana
+        cv2.imshow('Video', frame)
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
+
         glfw.poll_events()
 
     glfw.terminate()
