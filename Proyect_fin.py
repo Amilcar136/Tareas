@@ -10,6 +10,10 @@ rotation = [0, 0, 0]  # Rotación (x, y, z)
 translation = [0, 0, -5]  # Traslación inicial
 scale = 1.0  # Escalamiento
 
+#parametros flujo
+lkparm = dict(winSize=(15,15), maxLevel=2,
+              criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+
 def init_gl():
     glEnable(GL_DEPTH_TEST)
     glMatrixMode(GL_PROJECTION)
@@ -61,30 +65,20 @@ def render():
     draw_tetrahedron()
     glfw.swap_buffers(window)
 
-def update_transformations(contour, width, height):
-    global translation, rotation, scale
+def update_transformations(p1, p0):
+    global translation, rotation
 
-    #Calcular momentos del contorno
-    moments = cv2.moments(contour)
-    if moments['m00'] == 0:
-        return
-    
-    # Centroide del contorno
-    cx = int(moments['m10'] / moments['m00'])
-    cy = int(moments['m01'] / moments['m00'])
+    #Calcular desplazamiento promedio
+    delta = (p1 - p0).reshape(-1, 2)
+    mean_delta = np.mean(delta, axis=0)
 
-    # Calcular traslación
-    translation[0] = (cx / width - 0.5) * 10  # Mapea el rango [0, ancho] a [-5, 5]
-    translation[1] = -(cy / height - 0.5) * 10 # Invertir para OpenGL
+    #Actualizar traslación
+    translation[0] += mean_delta[0] * 0.01 #Escalar factor para suavizar
+    translation[1] -= mean_delta[1] * 0.01
 
-    # Calcular escala basada en el área del contorno
-    area = cv2.contourArea(contour)
-    scale = 1 + (area / (width * height)) * 5
-
-    # Calcular rotación basada en el ángulo del contorno
-    rect = cv2.minAreaRect(contour)
-    angle = rect[-1]
-    rotation[2] = angle
+    #Actualizar rotacion
+    rotation[1] += mean_delta[0] * 0.05 #rotacion alrededor de y
+    rotation[0] -= mean_delta[1] * 0.05 #rotacion alrededor de x
 
 # Bucle principal
 def main():
@@ -104,38 +98,60 @@ def main():
 
     #iniciar camara con opencv
     cap = cv2.VideoCapture(0)
+    _, vframe = cap.read()
+    vgris = cv2.cvtColor(vframe, cv2.COLOR_BGR2GRAY)
+
+    #puntos iniciales para flujo optico
+    p0 = np.array([(50, 50), (150, 50), (250, 50),
+                   (50, 150), (150, 150), (250, 150),
+                   (50, 250), (150, 250), (250, 250)])
+    p0 = np.float32(p0[:, np.newaxis, :])
 
     while not glfw.window_should_close(window):
         ret, frame = cap.read()
         if not ret:
             break
+        fgris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Procesar imagen
-        frame = cv2.flip(frame, 1)
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        #calcular flujo optico
+        p1, st, err = cv2.calcOpticalFlowPyrLK(vgris, fgris, p0, None, **lkparm)
 
-        # Definir rango de color de piel en HSV
-        lower_skin = np.array([0, 20, 70], dtype=np.uint8)
-        upper_skin = np.array([20, 255, 255], dtype=np.uint8)
+        if p1 is None:
+            vgris = fgris.copy()
+            continue
+        else:
+            bp1 = p1[st == 1]
+            bp0 = p0[st == 1]
 
-        # Máscara para aislar la piel
-        mask = cv2.inRange(hsv, lower_skin, upper_skin)
+        #dibujar lineas y puntos
+        for i in range(len(bp1) - 1):
+            a, b = (int(x) for x in bp1[i].ravel())
+            c, d = (int(x) for x in bp1[i + 1].ravel())
+            frame = cv2.line(frame, (a, b), (c, d), (0, 255, 0), 2)
+        for i, (nv, vj) in enumerate(zip(bp1, bp0)):
+            a, b = (int(x) for x in nv.ravel())
+            c, d = (int(x) for x in vj.ravel())
+            frame = cv2.circle(frame, (a, b), 3, (0, 0, 255), -1)
 
-        # Filtrar ruido
-        mask = cv2.medianBlur(mask, 5)
+        #Actualizar transformaciones
+        update_transformations(bp1, bp0)
 
-        # Encontrar contornos
-        contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        if contours:
-            # Tomar el contorno más grande
-            largest_contour = max(contours, key=cv2.contourArea)
-            update_transformations(largest_contour, frame.shape[1], frame.shape[0])
+        #Mostrar matriz en una esquina
+        matrix_text = str(bp1.reshape(-1, 2))
+        y0, dy = 30, 20
+        for i, line in enumerate(matrix_text.splitlines()):
+            y = y0 + i * dy
+            cv2.putText(frame, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+
+        #Mostrar video
+        cv2.imshow('Video', frame)
 
         # Renderizar escena
         render()
 
-        # Mostrar video en una ventana
-        cv2.imshow('Video', frame)
+        vgris = fgris.copy()
+
+        #Salir con tecla ESC
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
