@@ -79,23 +79,27 @@ def update_transformations(delta):
     rotation[0] -= mean_delta[1] * 0.05 #rotacion alrededor de x
 
 def draw_points(frame, p1, p0):
-    for i in range(len(p1) - 1):
-        a, b = (int(x) for x in p1[i].ravel())
-        c, d = (int(x) for x in p1[i + 1].ravel())
-        frame = cv2.line(frame, (a, b), (c, d), (0, 255, 0), 2)
+    while True:
+        for i in range(len(p1) - 1):
+            a, b = (int(x) for x in p1[i].ravel())
+            c, d = (int(x) for x in p1[i+1].ravel())
+            frame = cv2.line(frame, (a,b), (c,d), (0,0,255), 2)
 
-    for i in range(0, len(p1), 5):
+            # Dibujar líneas verticales entre los puntos consecutivos
+        for i in range(0, len(p1), 5):
             for j in range(5):
                 if i + j < len(p1):
                     a, b = (int(x) for x in p1[i+j].ravel())
                     if i + j + 5 < len(p1):
                         c, d = (int(x) for x in p1[i+j+5].ravel())
                         frame = cv2.line(frame, (a,b), (c,d), (0,0,255), 2)
-    
-    for nv in p0:
-        a, b = (int(x) for x in nv.ravel())
-        frame = cv2.circle(frame, (a, b), 3, (0, 0, 255), -1)
-    return frame
+
+            # Dibujar círculos en los puntos
+        for i, (nv, vj) in enumerate(zip(p1, p0)):
+            a, b = (int(x) for x in nv.ravel())
+            c, d = (int(x) for x in vj.ravel())
+            dist = np.linalg.norm(nv.ravel() - vj.ravel())
+            return frame
 
 # Bucle principal
 def main():
