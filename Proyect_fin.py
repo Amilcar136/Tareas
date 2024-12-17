@@ -65,11 +65,9 @@ def render():
     draw_tetrahedron()
     glfw.swap_buffers(window)
 
-def update_transformations(p1, p0):
+def update_transformations(delta):
     global translation, rotation
 
-    #Calcular desplazamiento promedio
-    delta = (p1 - p0).reshape(-1, 2)
     mean_delta = np.mean(delta, axis=0)
 
     #Actualizar traslación
@@ -80,9 +78,28 @@ def update_transformations(p1, p0):
     rotation[1] += mean_delta[0] * 0.05 #rotacion alrededor de y
     rotation[0] -= mean_delta[1] * 0.05 #rotacion alrededor de x
 
+def draw_points(frame, p1, p0):
+    for i in range(len(p1) - 1):
+        a, b = (int(x) for x in p1[i].ravel())
+        c, d = (int(x) for x in p1[i + 1].ravel())
+        frame = cv2.line(frame, (a, b), (c, d), (0, 255, 0), 2)
+
+    for i in range(0, len(p1), 5):
+            for j in range(5):
+                if i + j < len(p1):
+                    a, b = (int(x) for x in p1[i+j].ravel())
+                    if i + j + 5 < len(p1):
+                        c, d = (int(x) for x in p1[i+j+5].ravel())
+                        frame = cv2.line(frame, (a,b), (c,d), (0,0,255), 2)
+    
+    for nv in p0:
+        a, b = (int(x) for x in nv.ravel())
+        frame = cv2.circle(frame, (a, b), 3, (0, 0, 255), -1)
+    return frame
+
 # Bucle principal
 def main():
-    global window
+    global window, rotation, translation
 
     #Iniciar glfw
     if not glfw.init():
@@ -102,10 +119,9 @@ def main():
     vgris = cv2.cvtColor(vframe, cv2.COLOR_BGR2GRAY)
 
     #puntos iniciales para flujo optico
-    p0 = np.array([(50, 50), (150, 50), (250, 50),
+    p0 = np.float32([(50, 50), (150, 50), (250, 50),
                    (50, 150), (150, 150), (250, 150),
-                   (50, 250), (150, 250), (250, 250)])
-    p0 = np.float32(p0[:, np.newaxis, :])
+                   (50, 250), (150, 250), (250, 250)]).reshape(-1, 1, 2)
 
     while not glfw.window_should_close(window):
         ret, frame = cap.read()
@@ -116,32 +132,15 @@ def main():
         #calcular flujo optico
         p1, st, err = cv2.calcOpticalFlowPyrLK(vgris, fgris, p0, None, **lkparm)
 
-        if p1 is None:
-            vgris = fgris.copy()
-            continue
+        if p1 is not None:
+            bp1, bp0 = p1[st == 1], p0[st == 1]
+            update_transformations(bp1 - bp0)
+            frame = draw_points(frame, bp1, bp0)
+            p0 = p1.copy()
         else:
-            bp1 = p1[st == 1]
-            bp0 = p0[st == 1]
-
-        #dibujar lineas y puntos
-        for i in range(len(bp1) - 1):
-            a, b = (int(x) for x in bp1[i].ravel())
-            c, d = (int(x) for x in bp1[i + 1].ravel())
-            frame = cv2.line(frame, (a, b), (c, d), (0, 255, 0), 2)
-        for i, (nv, vj) in enumerate(zip(bp1, bp0)):
-            a, b = (int(x) for x in nv.ravel())
-            c, d = (int(x) for x in vj.ravel())
-            frame = cv2.circle(frame, (a, b), 3, (0, 0, 255), -1)
-
-        #Actualizar transformaciones
-        update_transformations(bp1, bp0)
-
-        #Mostrar matriz en una esquina
-        matrix_text = str(bp1.reshape(-1, 2))
-        y0, dy = 30, 20
-        for i, line in enumerate(matrix_text.splitlines()):
-            y = y0 + i * dy
-            cv2.putText(frame, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+            #p0 = np.float32([(50, 50), (150, 50), (250, 50),
+            #                 (50, 150), (150, 150), (250, 150)]).reshape(-1, 1, 2)
+            pass
 
         #Mostrar video
         cv2.imshow('Video', frame)
